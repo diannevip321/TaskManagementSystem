@@ -1,35 +1,39 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+// src/App.tsx
+import { useState } from "react";
+import { buildLoginUrl, buildLogoutUrl } from "./auth/auth";
 
 function App() {
-  const [count, setCount] = useState(0)
+  const currentUrl = new URL(window.location.href);
+  const codeFromUrl = currentUrl.searchParams.get("code");
+  const [authCode] = useState<string | null>(codeFromUrl);
+
+  if (codeFromUrl) {
+    currentUrl.searchParams.delete("code");
+    window.history.replaceState({}, "", currentUrl.toString());
+  }
 
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
+    <div style={{ padding: "2rem", fontFamily: "system-ui, sans-serif" }}>
+      <h1>Task Management System</h1>
+      <p>This is the Cognito authentication test page (Step 3).</p>
+
+      {!authCode ? (
+        <>
+          <p>You are <strong>not logged in</strong>.</p>
+          <button onClick={() => (window.location.href = buildLoginUrl())}>
+            Login with Cognito
+          </button>
+        </>
+      ) : (
+        <>
+          <p>You are <strong>logged in</strong>. (Authorization code received.)</p>
+          <button onClick={() => (window.location.href = buildLogoutUrl())}>
+            Logout
+          </button>
+        </>
+      )}
+    </div>
+  );
 }
 
-export default App
+export default App;
