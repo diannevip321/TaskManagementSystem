@@ -1,18 +1,10 @@
-// src/handlers/tasksHandler.js
-// Main Lambda handler for task CRUD operations.
-
-const { ddb } = require("../utils/dbClient");
-const { jsonResponse } = require("../utils/responses");
-const {
-  PutCommand,
-  QueryCommand,
-  UpdateCommand,
-  DeleteCommand,
-} = require("@aws-sdk/lib-dynamodb");
-const { v4: uuidv4 } = require("uuid");
+const { ddb } = require("./dbClient");
+const { jsonResponse } = require("./responses");
+const crypto = require("crypto");
 
 const TASKS_TABLE = process.env.TASKS_TABLE || "Tasks";
 const DEMO_USER_ID = "demo-user";
+const ALLOWED_STATUSES = ["todo", "in-progress", "done"];
 
 exports.handler = async (event) => {
   console.log("Incoming event:", JSON.stringify(event));
@@ -56,93 +48,115 @@ exports.handler = async (event) => {
 };
 
 async function listTasks() {
-  const result = await ddb.send(
-    new QueryCommand({
-      TableName: TASKS_TABLE,
-      KeyConditionExpression: "userId = :u",
-      ExpressionAttributeValues: {
-        ":u": DEMO_USER_ID,
-      },
-    })
-  );
+  const params = {
+    TableName: TASKS_TABLE,
+    KeyConditionExpression: "userId = :u",
+    ExpressionAttributeValues: {
+      ":u": DEMO_USER_ID,
+    },
+  };
 
+  const result = await ddb.query(params).promise();
   return jsonResponse(200, result.Items || []);
 }
 
 async function createTask(body) {
   const now = new Date().toISOString();
 
+  const title = body.title || "Untitled task";
+  const description = body.description || "";
+  const status = ALLOWED_STATUSES.includes(body.status)
+    ? body.status
+    : "todo";
+
   const item = {
     userId: DEMO_USER_ID,
-    taskId: uuidv4(),
-    title: body.title || "Untitled task",
-    description: body.description || "",
-    status: "todo", // todo | in-progress | done
+    taskId: crypto.randomUUID(),
+    title,
+    description,
+    status,
     createdAt: now,
     updatedAt: now,
   };
 
-  await ddb.send(
-    new PutCommand({
-      TableName: TASKS_TABLE,
-      Item: item,
-    })
-  );
+  const params = {
+    TableName: TASKS_TABLE,
+    Item: item,
+  };
 
+  await ddb.put(params).promise();
   return jsonResponse(201, item);
 }
 
 async function updateTask(taskId, body) {
   const now = new Date().toISOString();
+
   const updateExpressions = [];
   const expressionValues = {
-    ":u": DEMO_USER_ID,
-    ":t": taskId,
     ":updatedAt": now,
   };
+  const expressionNames = {};
 
   if (body.title !== undefined) {
     updateExpressions.push("title = :title");
     expressionValues[":title"] = body.title;
   }
+
   if (body.description !== undefined) {
     updateExpressions.push("description = :description");
     expressionValues[":description"] = body.description;
   }
+
   if (body.status !== undefined) {
-    updateExpressions.push("status = :status");
+    if (!ALLOWED_STATUSES.includes(body.status)) {
+      return jsonResponse(400, {
+        error: "Invalid status",
+        allowed: ALLOWED_STATUSES,
+      });
+    }
+
+    updateExpressions.push("#status = :status");
     expressionValues[":status"] = body.status;
+    expressionNames["#status"] = "status";
   }
 
   updateExpressions.push("updatedAt = :updatedAt");
 
-  const result = await ddb.send(
-    new UpdateCommand({
-      TableName: TASKS_TABLE,
-      Key: {
-        userId: DEMO_USER_ID,
-        taskId,
-      },
-      UpdateExpression: "SET " + updateExpressions.join(", "),
-      ExpressionAttributeValues: expressionValues,
-      ReturnValues: "ALL_NEW",
-    })
-  );
+  if (updateExpressions.length === 1) {
+    return jsonResponse(400, {
+      error: "No updatable fields provided",
+    });
+  }
 
+  const params = {
+    TableName: TASKS_TABLE,
+    Key: {
+      userId: DEMO_USER_ID,
+      taskId,
+    },
+    UpdateExpression: "SET " + updateExpressions.join(", "),
+    ExpressionAttributeValues: expressionValues,
+    ReturnValues: "ALL_NEW",
+  };
+
+  if (Object.keys(expressionNames).length > 0) {
+    params.ExpressionAttributeNames = expressionNames;
+  }
+
+  const result = await ddb.update(params).promise();
   return jsonResponse(200, result.Attributes);
 }
 
 async function deleteTask(taskId) {
-  await ddb.send(
-    new DeleteCommand({
-      TableName: TASKS_TABLE,
-      Key: {
-        userId: DEMO_USER_ID,
-        taskId,
-      },
-    })
-  );
+  const params = {
+    TableName: TASKS_TABLE,
+    Key: {
+      userId: DEMO_USER_ID,
+      taskId,
+    },
+  };
 
+  await ddb.delete(params).promise();
   return jsonResponse(204, null);
 }
 
