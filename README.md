@@ -1,6 +1,6 @@
 # TaskManagementSystem
 
-A fully serverless Task Management System built using AWS Cognito, API Gateway, Lambda, DynamoDB, S3, and CloudFront.  
+A Task Management System built using AWS Cognito, API Gateway, Lambda, DynamoDB, S3, and CloudFront.  
 The application supports authenticated users, secure task storage, and a modern React/TypeScript frontend deployed globally.
 
 **Live URL:**  
@@ -83,12 +83,6 @@ Deletes a specific task.
 
 ## Future Improvements
 
-- **Add a Custom Domain Name**  
-  Configure Route 53 + ACM to map a domain such as `tasks.dianne.app` to the CloudFront distribution.
-
-- **Implement Token Refresh Logic**  
-  Support automatic refresh using the Cognito-provided refresh token instead of logging out after token expiration.
-
 - **Add Pagination & Query Filters**  
   For large numbers of tasks, add pagination, status filters, and search.
 
@@ -100,8 +94,6 @@ Deletes a specific task.
 
 - **Add Unit and Integration Tests**  
   Jest tests for frontend components and integration tests for Lambda functions.
-
----
 
 ## Author
 
