@@ -1,5 +1,5 @@
-// src/api/tasksApi.ts
 import { CONFIG } from "../config";
+import { ACCESS_TOKEN_KEY } from "../auth/auth";
 
 export type TaskStatus = "todo" | "in-progress" | "done";
 
@@ -15,7 +15,22 @@ export interface Task {
 
 const BASE_URL = CONFIG.API_BASE_URL;
 
-// Helper to handle responses
+function getAccessToken(): string {
+  const token = sessionStorage.getItem(ACCESS_TOKEN_KEY);
+  if (!token) {
+    throw new Error("No access token available. Are you logged in?");
+  }
+  return token;
+}
+
+function buildAuthHeaders() {
+  const token = getAccessToken();
+  return {
+    Authorization: `Bearer ${token}`,
+    "Content-Type": "application/json",
+  };
+}
+
 async function handleJson<T>(res: Response): Promise<T> {
   if (!res.ok) {
     const text = await res.text();
@@ -28,7 +43,10 @@ export async function getTasks(): Promise<Task[]> {
   if (!BASE_URL) {
     throw new Error("CONFIG.API_BASE_URL is not set.");
   }
-  const res = await fetch(`${BASE_URL}/tasks`);
+  const res = await fetch(`${BASE_URL}/tasks`, {
+    method: "GET",
+    headers: buildAuthHeaders(),
+  });
   return handleJson<Task[]>(res);
 }
 
@@ -41,7 +59,7 @@ export async function createTask(input: {
   }
   const res = await fetch(`${BASE_URL}/tasks`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: buildAuthHeaders(),
     body: JSON.stringify({
       title: input.title,
       description: input.description ?? "",
@@ -60,7 +78,7 @@ export async function updateTask(
   }
   const res = await fetch(`${BASE_URL}/tasks/${taskId}`, {
     method: "PUT",
-    headers: { "Content-Type": "application/json" },
+    headers: buildAuthHeaders(),
     body: JSON.stringify(partial),
   });
   return handleJson<Task>(res);
@@ -72,6 +90,7 @@ export async function deleteTask(taskId: string): Promise<void> {
   }
   const res = await fetch(`${BASE_URL}/tasks/${taskId}`, {
     method: "DELETE",
+    headers: buildAuthHeaders(),
   });
   if (!res.ok) {
     const text = await res.text();
